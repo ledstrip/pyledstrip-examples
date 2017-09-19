@@ -1,5 +1,5 @@
-from pyledstrip import pyledstrip
+from pyledstrip import LedStrip
 
 if __name__ == "__main__":
-	pyledstrip.clear()
-	pyledstrip.transmit()
+	strip = LedStrip()
+	strip.off()

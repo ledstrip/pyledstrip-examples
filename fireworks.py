@@ -3,7 +3,7 @@
 import random
 import time
 
-from pyledstrip import pyledstrip
+from pyledstrip import LedStrip
 
 # todo time instead of frame based calculations
 # todo do not sleep fixed amount of time
@@ -47,13 +47,13 @@ class Rocket:
 		self.pos += self.speed
 		self.speed *= 0.97
 
-	def draw(self):
+	def draw(self, strip):
 		brightness = 1.0
 		if self.lastbright:
 			brightness = 0.0
 
 		self.lastbright = not self.lastbright
-		pyledstrip.add_rgb(self.pos, brightness, brightness, brightness)
+		strip.add_rgb(self.pos, brightness, brightness, brightness)
 
 
 class Particle:
@@ -75,8 +75,8 @@ class Particle:
 		self.speed *= 0.985
 		self.brightness *= self.decay
 
-	def draw(self):
-		pyledstrip.add_hsv(self.pos, self.hue, 1.0, self.brightness)
+	def draw(self, strip):
+		strip.add_hsv(self.pos, self.hue, 1.0, self.brightness)
 
 
 def maprange(value, frommin, frommax, tomin, tomax):
@@ -115,28 +115,30 @@ def trail(pos):
 if __name__ == "__main__":
 	frame = 0
 	next_rocket = 0
+	strip = LedStrip()
+
 	while True:
 		if frame == next_rocket:
 			launchrocket()
 			next_rocket = frame + random.randrange(30, 100)
 
-		pyledstrip.clear()
+		strip.clear()
 
 		for particle in particles:
 			particle.update()
-			particle.draw()
+			particle.draw(strip)
 
 		particles = list(filter(lambda item: item.brightness > 0.01, particles))
 
 		for rocket in rockets:
 			trail(rocket.pos)
 			rocket.update()
-			rocket.draw()
+			rocket.draw(strip)
 			if abs(rocket.speed) <= EXPLOSION_SPEED:
 				explosion(rocket.pos)
 
 		rockets = list(filter(lambda rocket: abs(rocket.speed) > EXPLOSION_SPEED, rockets))
 
-		pyledstrip.transmit()
+		strip.transmit()
 		frame += 1
 		time.sleep(0.015)
