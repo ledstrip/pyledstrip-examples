@@ -30,10 +30,6 @@ ROCKET_SPEED_MAX = 8.5
 # ROCKET_SPEED_MIN = 1.0
 # ROCKET_SPEED_MAX = 4.0
 
-rockets = []
-particles = []
-next_rocket = 0
-
 
 class Rocket:
 	pos = 0
@@ -84,67 +80,71 @@ def maprange(value, frommin, frommax, tomin, tomax):
 	return tomin + (tomax - tomin) * (value - frommin) / (frommax - frommin)
 
 
-def launchrocket():
-	global rockets
-	rockets.append(Rocket(
-		ROCKET_LAUNCH_POS,
-		random.choice(ROCKET_LAUNCH_DIRECTIONS) * random.uniform(ROCKET_SPEED_MIN, ROCKET_SPEED_MAX)
-	))
+class Fireworks:
+	PERIOD = 1 / 60
 
+	rockets = []
+	particles = []
+	next_rocket = 0
 
-def explosion(center):
-	global particles
-	color_center = random.random()
-	size = random.randrange(EXPLOSION_SIZE_MIN, EXPLOSION_SIZE_MAX)
-	for i in range(0, size):
-		particles.append(Particle(
-			center,
-			random.choice([-1.0, 1.0]) * random.uniform(0.0, maprange(
-				size,
-				EXPLOSION_SIZE_MIN, EXPLOSION_SIZE_MAX,
-				EXPLOSION_SPEED_MIN, EXPLOSION_SPEED_MAX
-			)),
-			(color_center + random.choice([-0.25, 0.25])) % 1.0,
-			random.uniform(0.6, 1.0)
+	def launchrocket(self):
+		self.rockets.append(Rocket(
+			ROCKET_LAUNCH_POS,
+			random.choice(ROCKET_LAUNCH_DIRECTIONS) * random.uniform(ROCKET_SPEED_MIN, ROCKET_SPEED_MAX)
 		))
 
+	def explosion(self, center):
+		color_center = random.random()
+		size = random.randrange(EXPLOSION_SIZE_MIN, EXPLOSION_SIZE_MAX)
+		for i in range(0, size):
+			self.particles.append(Particle(
+				pos=center,
+				speed=random.choice([-1.0, 1.0]) * random.uniform(0.0, maprange(
+					size,
+					EXPLOSION_SIZE_MIN, EXPLOSION_SIZE_MAX,
+					EXPLOSION_SPEED_MIN, EXPLOSION_SPEED_MAX
+				)),
+				hue=(color_center + random.choice([-0.25, 0.25])) % 1.0,
+				brightness=random.uniform(0.6, 1.0)
+			))
 
-def trail(pos):
-	particles.append(Particle(pos, 0, random.uniform(0.0, 0.2) % 1.0, random.uniform(0.1, 0.2), 0.8))
+	def trail(self, pos):
+		self.particles.append(Particle(
+			pos=pos,
+			speed=0,
+			hue=random.uniform(0.0, 0.2) % 1.0,
+			brightness=random.uniform(0.1, 0.2),
+			decay=0.8)
+		)
 
+	def update(self, strip):
+		if time.time() >= self.next_rocket:
+			self.launchrocket()
+			self.next_rocket = time.time() + random.uniform(0.9, 3.0)
 
-def update(strip):
-	global particles
-	global rockets
-	global next_rocket
+		strip.clear()
 
-	if time.time() >= next_rocket:
-		launchrocket()
-		next_rocket = time.time() + random.uniform(0.9, 3.0)
+		for particle in self.particles:
+			particle.update()
+			particle.draw(strip)
 
-	strip.clear()
+		self.particles = list(filter(lambda item: item.brightness > 0.01, self.particles))
 
-	for particle in particles:
-		particle.update()
-		particle.draw(strip)
+		for rocket in self.rockets:
+			self.trail(rocket.pos)
+			rocket.update()
+			rocket.draw(strip)
+			if abs(rocket.speed) <= EXPLOSION_SPEED:
+				self.explosion(rocket.pos)
 
-	particles = list(filter(lambda item: item.brightness > 0.01, particles))
+		self.rockets = list(filter(lambda rocket: abs(rocket.speed) > EXPLOSION_SPEED, self.rockets))
 
-	for rocket in rockets:
-		trail(rocket.pos)
-		rocket.update()
-		rocket.draw(strip)
-		if abs(rocket.speed) <= EXPLOSION_SPEED:
-			explosion(rocket.pos)
-
-	rockets = list(filter(lambda rocket: abs(rocket.speed) > EXPLOSION_SPEED, rockets))
-
-	strip.transmit()
+		strip.transmit()
 
 
 def main(args):
 	strip = LedStrip(args=args)
-	periodicx(update, 1 / 60, strip)
+	periodicx(Fireworks().update, Fireworks.PERIOD, strip)
 
 
 if __name__ == '__main__':
