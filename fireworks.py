@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import argparse
 import random
 import time
 
+from periodicx import periodicx
 from pyledstrip import LedStrip
-
-# todo time instead of frame based calculations
-# todo do not sleep fixed amount of time
 
 # one sided launcher
 EXPLOSION_SPEED = 0.05
@@ -33,6 +32,7 @@ ROCKET_SPEED_MAX = 8.5
 
 rockets = []
 particles = []
+next_rocket = 0
 
 
 class Rocket:
@@ -113,33 +113,41 @@ def trail(pos):
 	particles.append(Particle(pos, 0, random.uniform(0.0, 0.2) % 1.0, random.uniform(0.1, 0.2), 0.8))
 
 
-if __name__ == "__main__":
-	frame = 0
-	next_rocket = 0
-	strip = LedStrip()
+def update(strip):
+	global particles
+	global rockets
+	global next_rocket
 
-	while True:
-		if frame == next_rocket:
-			launchrocket()
-			next_rocket = frame + random.randrange(30, 100)
+	if time.time() >= next_rocket:
+		launchrocket()
+		next_rocket = time.time() + random.uniform(0.9, 3.0)
 
-		strip.clear()
+	strip.clear()
 
-		for particle in particles:
-			particle.update()
-			particle.draw(strip)
+	for particle in particles:
+		particle.update()
+		particle.draw(strip)
 
-		particles = list(filter(lambda item: item.brightness > 0.01, particles))
+	particles = list(filter(lambda item: item.brightness > 0.01, particles))
 
-		for rocket in rockets:
-			trail(rocket.pos)
-			rocket.update()
-			rocket.draw(strip)
-			if abs(rocket.speed) <= EXPLOSION_SPEED:
-				explosion(rocket.pos)
+	for rocket in rockets:
+		trail(rocket.pos)
+		rocket.update()
+		rocket.draw(strip)
+		if abs(rocket.speed) <= EXPLOSION_SPEED:
+			explosion(rocket.pos)
 
-		rockets = list(filter(lambda rocket: abs(rocket.speed) > EXPLOSION_SPEED, rockets))
+	rockets = list(filter(lambda rocket: abs(rocket.speed) > EXPLOSION_SPEED, rockets))
 
-		strip.transmit()
-		frame += 1
-		time.sleep(0.015)
+	strip.transmit()
+
+
+def main(args):
+	strip = LedStrip(args=args)
+	periodicx(update, 1 / 60, strip)
+
+
+if __name__ == '__main__':
+	parser = argparse.ArgumentParser(description='Example code for pyledstrip.')
+	LedStrip.add_arguments(parser)
+	main(parser.parse_args())
