@@ -102,3 +102,7 @@ ENV/
 
 #PyCharm
 /.idea
+
+periodicx.py
+pyledstrip.py
+config.ini
