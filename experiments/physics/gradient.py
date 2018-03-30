@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 import argparse
+import collections
 import fcntl
 import math
 import os
 import random
 import sys
-import collections
 import time
 
-
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import argrelextrema
 
@@ -65,14 +63,13 @@ class Paintable(Thing):
     mass = None
     width = None
 
-    def __init__(self, pos, v, hue, ttl=DEFAULT_TTL, radius=1.0):
+    def __init__(self, pos, v, hue, mass, radius, ttl=DEFAULT_TTL):
         self.pos = pos
         self.v = v
         self.hue = hue
         self.ttl = ttl
+        self.mass = mass
         self.radius = radius
-        self.mass = 2 * radius
-
         self.hist = collections.deque(maxlen=30)
 
     def __str__(self):
@@ -118,94 +115,53 @@ class Paintable(Thing):
 
         self.hist.append(self.pos)
 
-
-
     def is_alive(self, strip):
         return strip.led_count >= self.pos >= 0 and self.ttl >= 0
 
     def paint(self, strip: LedStrip):
-        # velocity_based_hue = min(math.pow(abs(self.v) / 2, 2), 0.9)
-        velocity_based_brightness = max(math.pow(abs(self.v) / 2, 2), 0.1) * min(self.ttl / 3, 1)
-        # strip.add_hsv(self.pos - self.radius, self.hue, 1, velocity_based_brightness)
-        strip.add_hsv(self.pos, self.hue, 1, velocity_based_brightness)
-        # strip.add_hsv(self.pos + self.radius, self.hue, 1, velocity_based_brightness)
-
-        for i, hpos in enumerate(self.hist):
-            strip.add_hsv(hpos, self.hue, 1, 1) # 1/len(self.hist) * i)
+        pass
 
 
 class Particle(Paintable):
-    def __init__(self, pos, v, hue, radius=1.0):
-        super().__init__(pos, v, hue=hue, radius=radius)
-        self.ttl2 = 8
+    def __init__(self, pos, v, hue, mass, radius, ttl=DEFAULT_TTL):
+        super().__init__(pos, v, hue=hue, mass=mass, radius=radius)
+        self.ttl2 = ttl
 
-    def tick(self, t, world2=None):
-        super().tick(t, world2)
-        self.ttl2 -= t
+    def tick(self, dt, world2=None):
+        super().tick(dt, world2)
+        self.ttl2 -= dt
 
     def is_alive(self, strip):
         return super().is_alive(strip) and self.ttl2 > 0
 
     def paint(self, strip: LedStrip):
-        # velocity_based_hue = min(math.pow(abs(self.v) / 2, 2), 0.9)
-        br = math.pow(self.ttl2 / 2, 3)  # max(math.pow(abs(self.v) / 2, 2), 0.1) * min(self.ttl / 3, 1)
-        # strip.add_hsv(self.pos - self.radius, self.hue, 1, velocity_based_brightness)
-        strip.add_hsv(self.pos, self.hue, 1, br)
-        # strip.add_hsv(self.pos + self.radius, self.hue, 1, velocity_based_brightness)
-
+        strip.add_hsv(self.pos, self.hue, 1, 1)
         for i, hpos in enumerate(self.hist):
             if i % 5 == 0:
-                strip.add_hsv(hpos, self.hue, 1, 0.05/len(self.hist) * i)
-
-    def spawn_things(self, strip):
-        # if self.is_alive(strip):
-        #     return []
-        # else:
-        #     s = 2
-        #     return [
-        #         Debris(pos=self.pos, v=random.uniform(-s, +s), hue=random.random(), radius=random.uniform(0.5, 2)),
-        #         Debris(pos=self.pos, v=random.uniform(-s, +s), hue=random.random(), radius=random.uniform(0.5, 2)),
-        #         Debris(pos=self.pos, v=random.uniform(-s, +s), hue=random.random(), radius=random.uniform(0.5, 2)),
-        #         Debris(pos=self.pos, v=random.uniform(-s, +s), hue=random.random(), radius=random.uniform(0.5, 2)),
-        #         Debris(pos=self.pos, v=random.uniform(-s, +s), hue=random.random(), radius=random.uniform(0.5, 2)),
-        #     ]
-        return []
-
-
-class Debris(Paintable):
-    def __init__(self, pos, v, hue, radius=1):
-        super().__init__(pos, v, hue=hue, radius=radius)
-        self.ttl2 = 1
-        print("Debris born")
-
-    def tick(self, t, world2=None):
-        super().tick(t, world2)
-        self.ttl2 -= t
-
-    def is_alive(self, strip):
-        return super().is_alive(strip) and self.ttl2 > 0
+                strip.add_hsv(hpos, self.hue, 1, 0.05 / len(self.hist) * i)
 
     def spawn_things(self, strip):
         return []
 
 
 class Launcher(Paintable):
-    def __init__(self, pos: float, hue: float, radius=1.0):
-        super().__init__(pos, 0, hue, radius=radius)
-        self.firerate = 1.5
+    def __init__(self, pos: float, hue: float, mass: float, radius: float):
+        super().__init__(pos, 0, hue, 1.0, radius=radius)
+        self.firerate = 1.2
+        self.mass = mass
         self.cooldown = self.firerate
 
-    def tick(self, t, world2=None):
-        self.cooldown -= t
+    def tick(self, dt, world2=None):
+        self.cooldown -= dt
 
     def spawn_things(self, strip):
         if self.cooldown < 0:
             self.cooldown = self.firerate * random.uniform(0.5, 1)
-            s = 0.15 * 4
-            s = random.uniform(-s, s)
+            s = 2
+            s = random.uniform(s / 2, s)
             return [
-                Particle(pos=self.pos, v=+s, hue=self.hue, radius=self.radius),
-                Particle(pos=self.pos, v=-s, hue=self.hue, radius=self.radius),
+                Particle(pos=self.pos, v=+s, hue=self.hue, mass=self.mass, radius=self.radius, ttl=1),
+                Particle(pos=self.pos, v=-s, hue=self.hue, mass=self.mass, radius=self.radius, ttl=1),
             ]
         else:
             return []
@@ -220,9 +176,9 @@ class Game:
         ys = my_world.to_np()[2, :]
         ys2 = savitzky_golay(ys, 51, 3)
 
-        plt.plot(ys)
-        plt.plot(ys2)
-        plt.show()
+        # plt.plot(ys)
+        # plt.plot(ys2)
+        # plt.show()
         (minima,) = argrelextrema(ys2, np.greater)
         (maxima,) = argrelextrema(ys2, np.less)
 
@@ -232,7 +188,7 @@ class Game:
 
         for extr in minima:
             self.things.append(
-                Launcher(pos=extr, hue=2 / 3, radius=-0.003) #blue
+                Launcher(pos=extr, hue=2 / 3, mass=-0.1, radius=-0.003)  #blue
             )
 
             ixys = my_world.to_np()
@@ -242,7 +198,7 @@ class Game:
 
         for extr in maxima:
             self.things.append(
-                Launcher(pos=extr, hue=0, radius=0.01)
+                Launcher(pos=extr, hue=0, mass=0.5, radius=0.01)
             )
 
             ixys = my_world.to_np()
@@ -260,11 +216,7 @@ class Game:
                 if ' ' in c:
                     print(".%s." % c)
                     self.things.append(
-                        Particle(pos=self.strip.led_count,
-                                 v=random.uniform(1, 3),
-                                 hue=random.random(),
-                                 radius=random.uniform(0.5, 2)
-                                 )
+                        Particle(pos=81, v=random.uniform(-3, 3), hue=random.random(), mass=1.0, radius=1.0, ttl=80)
                     )
                 elif len(c) > 0:
                     for particle in self.things:
@@ -304,17 +256,7 @@ class Game:
         self.things = next_generation
 
     def spawn(self):
-        if RANDOM_SPAWNS:
-            spawn = random.random()
-            if spawn < 0.005:
-                self.things.append(
-                    Particle(pos=0, v=-random.uniform(1, 3), hue=random.random(), radius=random.uniform(0.5, 2))
-                )
-            elif spawn >= 0.995:
-                self.things.append(
-                    Particle(pos=self.strip.led_count, v=random.uniform(1, 3), hue=random.random(),
-                             radius=random.uniform(0.5, 2))
-                )
+        pass
 
     def paint(self):
         for particle in self.things:
