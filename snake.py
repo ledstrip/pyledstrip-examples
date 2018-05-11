@@ -62,7 +62,7 @@ class Snake:
 
 
 def main(args):
-    strip = LedStrip(args=args, led_count=600, power_limit=0.1)
+    strip = LedStrip(args=args)
     periodicx(Snake().update, Snake.PERIOD, strip)
 
 
